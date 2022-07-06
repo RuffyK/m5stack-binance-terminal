@@ -1,8 +1,3 @@
-# M5Stack Binance Terminal
-Access binance using your ESP32 based M5 Stack Core
-
-## Roadmap
-
 <style>
     .d-flex {
         display: flex;
@@ -40,6 +35,13 @@ Access binance using your ESP32 based M5 Stack Core
         border: 3px solid #168aad;
     }
 </style>
+
+# M5Stack Binance Terminal
+Access binance using your ESP32 based M5 Stack Core
+
+## Roadmap
+
+
 <div class="d-flex">
     <div class="progress-panel">
         <span>July 2022</span>
