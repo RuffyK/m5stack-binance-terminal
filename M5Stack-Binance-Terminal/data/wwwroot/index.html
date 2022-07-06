@@ -1,0 +1,52 @@
+﻿<!DOCTYPE html>
+
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="styles/styles.css">
+    <title></title>
+    <style>
+    </style>
+    <script src="js/app.js" type='text/javascript'></script>
+</head>
+<body class="w3-light-gray">
+    <div class="w3-bar w3-blue w3-large">
+        <span class="w3-bar-item w3-xlarge">My Home</span>
+    </div>
+    <div class="w3-content">
+        <div class="w3-row">
+            <div class="w3-panel w3-third">
+                <h3 class="w3-text-blue">WLAN</h3>
+                <ul class="w3-ul w3-white w3-card">
+                    <li>
+                        <div id="wifiStatus">
+                            <div id="wifiRssiIndicator" style="position:relative; top:12px;" class="w3-right signal-bars mt1 sizing-box good five-bars"><div class="first-bar bar"></div><div class="second-bar bar"></div><div class="third-bar bar"></div><div class="fourth-bar bar"></div><div class="fifth-bar bar"></div></div>
+                            <span id="wifiSsidLabel"></span>
+                        </div>
+                        <span class="w3-small w3-text-grey" id="wifiStatusLabel"></span>
+                    </li>
+                    <li class="w3-button w3-light-gray w3-left-align" onclick="window.location.assign('wifi.html');" style="width:100%">
+                        <span class="w3-text-gray">Settings...</span>
+                    </li>
+                </ul>
+            </div>
+            <div class="w3-panel w3-third">
+                <h3 class="w3-text-blue">Filesystem</h3>
+                <ul class="w3-ul w3-white w3-card">
+                    <li class="w3-button w3-left-align" onclick="window.location.assign('explore.html');" style="width:100%;">
+                        <span>File explorer</span>
+                        <i class="material-icons w3-text-blue w3-right">folder</i>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    <script>
+        (function () {
+            setInterval(wifiStatus.update, 3000);
+            wifiStatus.update();
+        })();
+    </script>
+</body>
+</html>

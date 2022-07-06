@@ -1,0 +1,68 @@
+﻿<!DOCTYPE html>
+
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="styles/styles.css">
+    <title></title>
+    <style>
+    </style>
+    <script src="js/app.js" type='text/javascript'></script>
+</head>
+<body class="w3-light-gray">
+    <div class="w3-bar w3-blue w3-large">
+        <span class="w3-bar-item w3-xlarge">WiFi</span>
+    </div>
+    <div class="w3-content">
+        <div class="w3-row">
+            <div class="w3-panel">
+                <div class="w3-white w3-card">
+                    <ul id="wifiStatus" class="w3-ul w3-hide">
+                        <li>
+                            <div id="wifiRssiIndicator" style="position:relative; top:12px;" class="w3-right signal-bars mt1 sizing-box good five-bars"><div class="first-bar bar"></div><div class="second-bar bar"></div><div class="third-bar bar"></div><div class="fourth-bar bar"></div><div class="fifth-bar bar"></div></div>
+                            <span id="wifiSsidLabel">no connection</span>
+
+                            <div class="w3-row w3-small w3-text-grey">
+                                <div class="w3-half">
+                                    <span id="wifiStatusLabel">Status</span>
+                                </div>
+                                <div class="w3-half">
+                                    IP:
+                                    <span id="wifiIpLabel">0.0.0.0</span>
+                                </div>
+                            </div>
+                        </li>
+                    </ul>
+                    <div class="loaderbarcontainer">
+                        <div id="loader" class="loaderbar"></div>
+                    </div>
+                    <ul id="networkList" class="w3-ul"></ul>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div id="connectModal" class="w3-modal">
+        <div class="w3-modal-content">
+            <div class="w3-panel w3-blue">
+                <p class="w3-large" id="modalSsid"></p>
+            </div>
+            <div class="w3-container">
+                <p>Enter password:</p>
+                <input id="modalPw" type="password" class="w3-input" />
+                <button class="w3-button w3-blue w3-margin w3-right" onclick="connectModal();">Connect</button>
+                <button class="w3-button w3-text-blue w3-margin w3-right" , onclick="document.getElementById('connectModal').style.display = 'none';">Cancel</button>
+            </div>
+        </div>
+    </div>
+    <div id="snackbar">Some text some message..</div>
+    <script>
+        (function () {
+            setInterval(wifiStatus.update, 3000);
+            setInterval(networkList.scan, 9000);
+            wifiStatus.update();
+            networkList.scan();
+        })();
+    </script>
+</body>
+</html>

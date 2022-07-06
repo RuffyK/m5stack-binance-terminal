@@ -1,0 +1,36 @@
+﻿<!DOCTYPE html>
+
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="styles/styles.css">
+    <title></title>
+    <style>
+    </style>
+    <script src="js/app.js" type='text/javascript'></script>
+</head>
+<body class="w3-light-gray" style="margin-top:43px;">
+    <div class="w3-bar w3-blue w3-top">
+        <a href="#" id="explore-button" class="w3-hide-large w3-bar-item nav-button material-icons w3-text-blue w3-light-gray w3-border-light-gray" onclick="explorer.viewControl.toggle();" style="padding:10px;">
+        reorder
+        </a>
+        <span id="explore-header" class="w3-bar-item w3-large">Explore</span>
+    </div>
+    <div>
+        <div class="w3-row">
+            <div class="w3-col m4">
+                <div id="explore-view" class="w3-rightbar"></div>
+            </div>
+            <div class="w3-rest">
+                <textarea class="w3-input w3-hide-small" wrap="off" style="min-height:600px; width:100%"id="file-control"></textarea>
+            </div>
+        </div>
+    </div>
+    <script>
+        (function () {
+            initExplorer();
+        })();
+    </script>
+</body>
+</html>
