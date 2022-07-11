@@ -83,6 +83,7 @@ The first time you power up the M5Stack it will not be able to communicate with 
 
 * Enable your computer's WiFi (or use your Smartphone).
 * Connect your computer to the M5Stack-1 WiFi Network.
+  * Enter the password defined in the sketch, by default this is: `ruffycrabby`
 * Open a webbrowser and navigate to http://192.168.4.1/
 > **Note**: If you are using your Smartphone, disable mobile data as the Smartphone will try to use the mobile data to connect because the M5Stack-1 WiFi Network is not connected to the internet.
 * On the website provided, search the WLAN section and click `Settings`.
