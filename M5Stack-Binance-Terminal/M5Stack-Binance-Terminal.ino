@@ -17,18 +17,19 @@
 #define CHART_HEIGHT 190
 #define CHART_TOP 40
 #define CHART_LEFT 0
+#define SUB_CHART_HEIGHT 40
 #define CANDLE_WIDTH 3
 #define MOVING_AVG_MAX 21
 #define CHART_POINTS (int(CHART_WIDTH / CANDLE_WIDTH) + MOVING_AVG_MAX)
 #define KLINE_BUF_SIZE (CHART_POINTS * 280)
 
+#define COLOR_RED 0xF22B
+#define COLOR_GREEN 0x0E50
+
 #define BOLL_MVA_LENGTH 21
 #define BOLL_MULTIPLIER 2.2
 #define BOLL_UP_COLOR 0x77FF
 #define BOLL_DOWN_COLOR 0x77FF
-//0x10A5
-//0x18E6
-//0x2128
 #define BOLL_FILL_COLOR 0x10A5
 #define BOLL_MVA_COLOR 0x0E50
 
@@ -53,6 +54,7 @@ struct chartDataPoint {
   float highPrice;
   float lowPrice;
   float closePrice;
+  float volume;
   unsigned long long closeTime;
 };
 
@@ -61,9 +63,42 @@ TFT_eSprite chartSprite = TFT_eSprite(&M5.Lcd);
 
 void drawChart() { 
   
-  float local_min = 10000000000;
+  float local_min = 1000000000000;
   float local_max = 0;
+  //float volume_min = 1000000000000;
+  float volume_max = -1;
+  int sub_charts = 0;
   uint16_t backColor = BLACK;
+
+  bool draw_bollinger = true;
+  bool draw_volume = true;
+  
+  int bollinger_mva_length = BOLL_MVA_LENGTH;
+  float bollinger_multiplier = BOLL_MULTIPLIER;
+  float bollinger_mva[chartBuffer.size() - MOVING_AVG_MAX];
+  float bollinger_dev[chartBuffer.size() - MOVING_AVG_MAX];
+
+  if(draw_bollinger) {
+    for(int i = MOVING_AVG_MAX; i< chartBuffer.size(); i++) {
+      float boll_mva = 0;
+      for(int mva_i = 0; mva_i <  bollinger_mva_length; mva_i++){
+        boll_mva += chartBuffer[mva_i + i - bollinger_mva_length].closePrice;
+      }
+      boll_mva = boll_mva / bollinger_mva_length;
+  
+      float stddev = 0;
+      for(int mva_i = 0; mva_i <  bollinger_mva_length; mva_i++){
+        stddev += sqrt(pow(chartBuffer[mva_i + i - bollinger_mva_length].closePrice - boll_mva, 2));
+      }
+      stddev = stddev / (bollinger_mva_length-1);
+      bollinger_mva[i - MOVING_AVG_MAX] = boll_mva;
+      bollinger_dev[i - MOVING_AVG_MAX] = stddev;
+    }
+  }
+
+  if(draw_volume) {
+    sub_charts += 1;
+  }
   
   // Start at MOVING_AVG_MAX, as all previous data points
   // are only needed for moving avg calculation and will
@@ -76,14 +111,36 @@ void drawChart() {
     if(point.lowPrice < local_min) {
       local_min = point.lowPrice;
     }
+    
+    if(draw_bollinger){
+      float boll_mva = bollinger_mva[i - MOVING_AVG_MAX];
+      float boll_dev = bollinger_dev[i - MOVING_AVG_MAX];
+      if(boll_mva + (boll_dev * bollinger_multiplier) > local_max) {
+        local_max = boll_mva + (boll_dev * bollinger_multiplier);
+      }
+      if(boll_mva - (boll_dev * bollinger_multiplier) < local_min) {
+        local_min = boll_mva - (boll_dev * bollinger_multiplier);
+      }
+    }
+
+    if(draw_volume) {
+      if(point.volume > volume_max){
+        volume_max = point.volume;
+      }
+      /*if(point.volume < volume_min) {
+        volume_min = point.volume;
+      }*/
+    }
+    
   }
   chart_price_max = local_max;
   chart_price_min = local_min;
 
-  float boll_prev_mva = -1;
-  float boll_prev_dev = -1;
+  int sub_chart_height = SUB_CHART_HEIGHT;
+  int main_chart_height = CHART_HEIGHT - (sub_charts * sub_chart_height);
   
-  const float price_scale = CHART_HEIGHT / (chart_price_max - chart_price_min);
+  const float price_scale = main_chart_height / (chart_price_max - chart_price_min);
+  const float volume_scale = sub_chart_height / volume_max;
 
   for(int i = MOVING_AVG_MAX; i< chartBuffer.size(); i++) {
     chartSprite.fillSprite(backColor);
@@ -96,25 +153,14 @@ void drawChart() {
     /*********************************/
     /*   Bollinger Bands             */
     /*********************************/
-    float boll_mva = 0;
-    for(int mva_i = index; mva_i < index + BOLL_MVA_LENGTH; mva_i++){
-      boll_mva += chartBuffer[mva_i].closePrice;
-    }
-    boll_mva = boll_mva / BOLL_MVA_LENGTH;
 
-    float stddev = 0;
-    for(int mva_i = index; mva_i < index + BOLL_MVA_LENGTH; mva_i++){
-      stddev += sqrt(pow(chartBuffer[mva_i].closePrice - boll_mva, 2));
-    }
-    stddev = stddev / (BOLL_MVA_LENGTH-1);
-
-    if(boll_prev_mva >= 0) {
-      int boll_prev_mva_point = CHART_HEIGHT - int((boll_prev_mva - chart_price_min) * price_scale);
-      int boll_curr_mva_point = CHART_HEIGHT - int((boll_mva - chart_price_min) * price_scale);
-      int boll_prev_up_point = CHART_HEIGHT - int((boll_prev_mva + (boll_prev_dev * BOLL_MULTIPLIER) - chart_price_min) * price_scale);
-      int boll_curr_up_point = CHART_HEIGHT - int((boll_mva + (stddev * BOLL_MULTIPLIER) - chart_price_min) * price_scale);
-      int boll_prev_down_point = CHART_HEIGHT - int((boll_prev_mva - (boll_prev_dev * BOLL_MULTIPLIER) - chart_price_min) * price_scale);
-      int boll_curr_down_point = CHART_HEIGHT - int((boll_mva - (stddev * BOLL_MULTIPLIER) - chart_price_min) * price_scale);
+    if(index > 0 && draw_bollinger) {
+      int boll_prev_mva_point = main_chart_height - int((bollinger_mva[index-1] - chart_price_min) * price_scale);
+      int boll_curr_mva_point = main_chart_height - int((bollinger_mva[index] - chart_price_min) * price_scale);
+      int boll_prev_up_point = main_chart_height - int((bollinger_mva[index-1] + (bollinger_dev[index-1] * bollinger_multiplier) - chart_price_min) * price_scale);
+      int boll_curr_up_point = main_chart_height - int((bollinger_mva[index] + (bollinger_dev[index] * bollinger_multiplier) - chart_price_min) * price_scale);
+      int boll_prev_down_point = main_chart_height - int((bollinger_mva[index-1] - (bollinger_dev[index-1] * bollinger_multiplier) - chart_price_min) * price_scale);
+      int boll_curr_down_point = main_chart_height - int((bollinger_mva[index] - (bollinger_dev[index] * bollinger_multiplier) - chart_price_min) * price_scale);
 
       // Bollinger Bands filled area
       chartSprite.fillRect(0, max(boll_prev_up_point, boll_curr_up_point), CANDLE_WIDTH, min(boll_prev_down_point, boll_curr_down_point) - max(boll_prev_up_point, boll_curr_up_point), BOLL_FILL_COLOR);
@@ -125,23 +171,17 @@ void drawChart() {
       chartSprite.drawLine(0, boll_prev_down_point, CANDLE_WIDTH, boll_curr_down_point, BOLL_DOWN_COLOR);
     }
     
-    boll_prev_mva = boll_mva;
-    boll_prev_dev = stddev;
-    
-    
-
-    
     /*********************************/
     /*   Candles                     */
     /*********************************/
-    uint16_t color = GREEN;
+    uint16_t color = COLOR_GREEN;
     if(isLoss) {
-      color = RED;
+      color = COLOR_RED;
     }
-    int highPoint = CHART_HEIGHT - int((candle.highPrice - chart_price_min) * price_scale);
-    int lowPoint = CHART_HEIGHT - int((candle.lowPrice - chart_price_min) * price_scale);
-    int openPoint = CHART_HEIGHT - int((candle.openPrice - chart_price_min) * price_scale);
-    int closePoint = CHART_HEIGHT - int((candle.closePrice - chart_price_min) * price_scale);
+    int highPoint = main_chart_height - int((candle.highPrice - chart_price_min) * price_scale);
+    int lowPoint = main_chart_height - int((candle.lowPrice - chart_price_min) * price_scale);
+    int openPoint = main_chart_height - int((candle.openPrice - chart_price_min) * price_scale);
+    int closePoint = main_chart_height - int((candle.closePrice - chart_price_min) * price_scale);
     int highLowLineX = int(CANDLE_WIDTH / 2);
     chartSprite.drawLine(highLowLineX, lowPoint, highLowLineX, highPoint, color);
 
@@ -150,6 +190,15 @@ void drawChart() {
     }
     else {
       chartSprite.fillRect(0, closePoint, CANDLE_WIDTH, openPoint - closePoint, color);
+    }
+    
+    /*********************************/
+    /*   Volume subplot              */
+    /*********************************/
+    
+    if(draw_volume) {
+      int volume_scaled = int(candle.volume * volume_scale);
+      chartSprite.fillRect(0,  main_chart_height + sub_chart_height - volume_scaled, CANDLE_WIDTH, volume_scaled, color);
     }
     
     chartSprite.pushSprite(CHART_LEFT + (index * CANDLE_WIDTH), CHART_TOP);
@@ -180,6 +229,7 @@ void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
             float closePrice = response["k"]["c"].as<float>();
             float highPrice = response["k"]["h"].as<float>();
             float lowPrice = response["k"]["l"].as<float>();
+            float volume = response["k"]["v"].as<float>();
             unsigned long long openTime = response["k"]["t"].as<unsigned long long>();
 
             int mostRecentIndex = chartBuffer.size()-1;
@@ -188,6 +238,7 @@ void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
               chartBuffer[mostRecentIndex].highPrice = highPrice;
               chartBuffer[mostRecentIndex].openPrice = openPrice;
               chartBuffer[mostRecentIndex].closePrice = closePrice;
+              chartBuffer[mostRecentIndex].volume = volume;
             }
             else {
               chartDataPoint discarded;
@@ -198,16 +249,17 @@ void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
                 highPrice,
                 lowPrice,
                 closePrice,
+                volume,
                 response["k"]["T"].as<unsigned long long>()
               });
             }
             drawChart();
             
             if(closePrice > openPrice){
-              M5.Lcd.setTextColor(GREEN, BLACK);
+              M5.Lcd.setTextColor(COLOR_GREEN, BLACK);
             }
             else if (closePrice < openPrice) {
-              M5.Lcd.setTextColor(RED, BLACK);
+              M5.Lcd.setTextColor(COLOR_RED, BLACK);
             }
             //M5.Lcd.setCursor(0,84);
             //M5.Lcd.setTextSize(6);
@@ -294,7 +346,8 @@ void WiFiEvent(WiFiEvent_t event) {
               row[2].as<float>(),
               row[3].as<float>(),
               row[4].as<float>(),
-              row[6].as<unsigned long long>()
+              row[5].as<float>(),
+              row[6].as<unsigned long long>(),
             });
         }
         delay(20);
