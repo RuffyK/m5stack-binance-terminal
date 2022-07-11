@@ -19,9 +19,9 @@
 #define CHART_LEFT 0
 #define SUB_CHART_HEIGHT 40
 #define CANDLE_WIDTH 3
-#define MOVING_AVG_MAX 21
+#define MOVING_AVG_MAX 100
 #define CHART_POINTS (int(CHART_WIDTH / CANDLE_WIDTH) + MOVING_AVG_MAX)
-#define KLINE_BUF_SIZE (CHART_POINTS * 280)
+#define KLINE_BUF_SIZE (CHART_POINTS * 290)
 
 #define COLOR_RED 0xF22B
 #define COLOR_GREEN 0x0E50
@@ -32,6 +32,12 @@
 #define BOLL_DOWN_COLOR 0x77FF
 #define BOLL_FILL_COLOR 0x10A5
 #define BOLL_MVA_COLOR 0x0E50
+
+#define EMA_1_LENGTH 50
+#define EMA_1_COLOR 0xB5A8
+
+#define EMA_2_LENGTH 100
+#define EMA_2_COLOR 0xAB85
 
 #define SYMBOL "btcusdt"
 
@@ -72,14 +78,22 @@ void drawChart() {
 
   bool draw_bollinger = true;
   bool draw_volume = true;
+  bool draw_ema1 = true;
+  bool draw_ema2 = true;
   
   int bollinger_mva_length = BOLL_MVA_LENGTH;
   float bollinger_multiplier = BOLL_MULTIPLIER;
   float bollinger_mva[chartBuffer.size() - MOVING_AVG_MAX];
   float bollinger_dev[chartBuffer.size() - MOVING_AVG_MAX];
 
+  int ema_1_length = EMA_1_LENGTH;
+  float ema_1[chartBuffer.size() - MOVING_AVG_MAX];
+
+  int ema_2_length = EMA_2_LENGTH;
+  float ema_2[chartBuffer.size() - MOVING_AVG_MAX];
+
   if(draw_bollinger) {
-    for(int i = MOVING_AVG_MAX; i< chartBuffer.size(); i++) {
+    for(int i = MOVING_AVG_MAX; i < chartBuffer.size(); i++) {
       float boll_mva = 0;
       for(int mva_i = 0; mva_i <  bollinger_mva_length; mva_i++){
         boll_mva += chartBuffer[mva_i + i - bollinger_mva_length].closePrice;
@@ -99,7 +113,44 @@ void drawChart() {
   if(draw_volume) {
     sub_charts += 1;
   }
-  
+
+  if(draw_ema1) {
+    int ema_length = ema_1_length;
+    
+    float k = 2.0f / (ema_length + 1);
+    float ema = 0;
+    for(int i = 0; i < ema_length; i++) {
+      ema += chartBuffer[MOVING_AVG_MAX - i - 1].closePrice;
+    }
+    ema = ema / ema_length;
+    for(int i = MOVING_AVG_MAX; i < chartBuffer.size(); i++) {
+      int ema_i = i - MOVING_AVG_MAX;
+      if(ema_i > 0) {
+        ema = (k * (chartBuffer[i].closePrice - ema)) + ema;
+      }
+
+      ema_1[ema_i] = ema;
+    }
+  }
+
+  if(draw_ema2) {
+    int ema_length = ema_2_length;
+    
+    float k = 2.0f / (ema_length + 1);
+    float ema = 0;
+    for(int i = 0; i < ema_length; i++) {
+      ema += chartBuffer[MOVING_AVG_MAX - i - 1].closePrice;
+    }
+    ema = ema / ema_length;
+    for(int i = MOVING_AVG_MAX; i < chartBuffer.size(); i++) {
+      int ema_i = i - MOVING_AVG_MAX;
+      if(ema_i > 0) {
+        ema = (k * (chartBuffer[i].closePrice - ema)) + ema;
+      }
+
+      ema_2[ema_i] = ema;
+    }
+  }
   // Start at MOVING_AVG_MAX, as all previous data points
   // are only needed for moving avg calculation and will
   // not be drawn on the chart
@@ -131,6 +182,24 @@ void drawChart() {
         volume_min = point.volume;
       }*/
     }
+
+    if(draw_ema1) {
+      if(ema_1[i - MOVING_AVG_MAX] > local_max) {
+        local_max = ema_1[i - MOVING_AVG_MAX];
+      }
+      if(ema_1[i - MOVING_AVG_MAX] < local_min){
+        local_min = ema_1[i - MOVING_AVG_MAX];
+      }
+    }
+
+    if(draw_ema2) {
+      if(ema_2[i - MOVING_AVG_MAX] > local_max) {
+        local_max = ema_2[i - MOVING_AVG_MAX];
+      }
+      if(ema_2[i - MOVING_AVG_MAX] < local_min){
+        local_min = ema_2[i - MOVING_AVG_MAX];
+      }
+    }
     
   }
   chart_price_max = local_max;
@@ -154,13 +223,13 @@ void drawChart() {
     /*   Bollinger Bands             */
     /*********************************/
 
-    if(index > 0 && draw_bollinger) {
-      int boll_prev_mva_point = main_chart_height - int((bollinger_mva[index-1] - chart_price_min) * price_scale);
-      int boll_curr_mva_point = main_chart_height - int((bollinger_mva[index] - chart_price_min) * price_scale);
-      int boll_prev_up_point = main_chart_height - int((bollinger_mva[index-1] + (bollinger_dev[index-1] * bollinger_multiplier) - chart_price_min) * price_scale);
-      int boll_curr_up_point = main_chart_height - int((bollinger_mva[index] + (bollinger_dev[index] * bollinger_multiplier) - chart_price_min) * price_scale);
-      int boll_prev_down_point = main_chart_height - int((bollinger_mva[index-1] - (bollinger_dev[index-1] * bollinger_multiplier) - chart_price_min) * price_scale);
-      int boll_curr_down_point = main_chart_height - int((bollinger_mva[index] - (bollinger_dev[index] * bollinger_multiplier) - chart_price_min) * price_scale);
+    if(draw_bollinger && index < chartBuffer.size() - MOVING_AVG_MAX - 1) {
+      int boll_prev_mva_point = main_chart_height - int((bollinger_mva[index] - chart_price_min) * price_scale);
+      int boll_curr_mva_point = main_chart_height - int((bollinger_mva[index+1] - chart_price_min) * price_scale);
+      int boll_prev_up_point = main_chart_height - int((bollinger_mva[index] + (bollinger_dev[index] * bollinger_multiplier) - chart_price_min) * price_scale);
+      int boll_curr_up_point = main_chart_height - int((bollinger_mva[index+1] + (bollinger_dev[index+1] * bollinger_multiplier) - chart_price_min) * price_scale);
+      int boll_prev_down_point = main_chart_height - int((bollinger_mva[index] - (bollinger_dev[index] * bollinger_multiplier) - chart_price_min) * price_scale);
+      int boll_curr_down_point = main_chart_height - int((bollinger_mva[index+1] - (bollinger_dev[index+1] * bollinger_multiplier) - chart_price_min) * price_scale);
 
       // Bollinger Bands filled area
       chartSprite.fillRect(0, max(boll_prev_up_point, boll_curr_up_point), CANDLE_WIDTH, min(boll_prev_down_point, boll_curr_down_point) - max(boll_prev_up_point, boll_curr_up_point), BOLL_FILL_COLOR);
@@ -170,6 +239,23 @@ void drawChart() {
       chartSprite.drawLine(0, boll_prev_up_point, CANDLE_WIDTH, boll_curr_up_point, BOLL_UP_COLOR);
       chartSprite.drawLine(0, boll_prev_down_point, CANDLE_WIDTH, boll_curr_down_point, BOLL_DOWN_COLOR);
     }
+
+    /*********************************/
+    /*   EMA                         */
+    /*********************************/
+
+    if(draw_ema1 && index < chartBuffer.size() - MOVING_AVG_MAX - 1) {
+      int ema_point = main_chart_height - int((ema_1[index] - chart_price_min) * price_scale);
+      int next_ema_point = main_chart_height - int((ema_1[index+1] - chart_price_min) * price_scale);
+      chartSprite.drawLine(0, ema_point, CANDLE_WIDTH, next_ema_point, EMA_1_COLOR);
+    }
+    
+    if(draw_ema2 && index < chartBuffer.size() - MOVING_AVG_MAX - 1) {
+      int ema_point = main_chart_height - int((ema_2[index] - chart_price_min) * price_scale);
+      int next_ema_point = main_chart_height - int((ema_2[index+1] - chart_price_min) * price_scale);
+      chartSprite.drawLine(0, ema_point, CANDLE_WIDTH, next_ema_point, EMA_2_COLOR);
+    }
+
     
     /*********************************/
     /*   Candles                     */
