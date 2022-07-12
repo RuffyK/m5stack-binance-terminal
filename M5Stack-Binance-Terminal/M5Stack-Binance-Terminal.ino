@@ -24,6 +24,7 @@ const char APNAME[] = "M5Stack-1";
 #define CANDLE_WIDTH 3
 
 #define CHART_GRID_MAX_STEPS 7
+#define SUB_CHART_GRID_MAX_STEPS 2
 #define CHART_GRID_COLOR_1 0x1925
 #define CHART_GRID_PRICE_TICK_WIDTH 46
 #define CHART_GRID_PRICE_TICK_COLOR 0x4AAB
@@ -94,6 +95,24 @@ String getPriceString(float price) {
   else{
     return String(price, 6);
   }
+}
+
+float getStepSize(float range_min, float range_max, int max_steps){
+  float step = (range_max - range_min) / (float)(max_steps + 1);
+  float order = powf(10, floorf(log10(step)));
+  float delta = (int)(step / order + 0.5);
+  static float ndex[] = {1, 1.5, 2, 2.5, 5, 10};
+  static int ndexLenght = sizeof(ndex)/sizeof(float);
+  for(int i = ndexLenght - 2; i > 0; --i) {
+      if(delta > ndex[i]) {
+        return ndex[i + 1] * order;
+      }
+  }
+  return delta * order;
+}
+
+float getStepFloor(float range_min, float step_size){
+  return range_min - fmod(range_min, step_size) + step_size;
 }
 
 void drawChart() { 
@@ -240,23 +259,19 @@ void drawChart() {
   int main_chart_height = CHART_HEIGHT - (sub_charts * sub_chart_height);
   
   const float price_scale = main_chart_height / (chart_price_max - chart_price_min);
-  const float volume_scale = sub_chart_height / volume_max;
+  const float volume_scale = (sub_chart_height - 1) / volume_max;
 
   int step_count = CHART_GRID_MAX_STEPS;
-  float step = (chart_price_max - chart_price_min) / (float)(step_count+1);
-  float order = powf(10, floorf(log10(step)));
-  float delta = (int)(step / order + 0.5);
+  float step = getStepSize(chart_price_min, chart_price_max, step_count);
+  float step_floor = getStepFloor(chart_price_min, step);
 
-  step = delta * order;
-  static float ndex[] = {1, 1.5, 2, 2.5, 5, 10};
-  static int ndexLenght = sizeof(ndex)/sizeof(float);
-  for(int i = ndexLenght - 2; i > 0; --i) {
-      if(delta > ndex[i]) {
-        step = ndex[i + 1] * order;
-        break;
-      }
+  int volume_step_count = SUB_CHART_GRID_MAX_STEPS;
+  float volume_step = 0;
+  float volume_step_floor = 0;
+
+  if(draw_volume) {
+    volume_step = getStepSize(0, volume_max, volume_step_count);
   }
-  float step_floor = chart_price_min - fmod(chart_price_min, step) + step;
 
   uint16_t color = COLOR_GREEN;
   bool isLoss = false;
@@ -341,6 +356,13 @@ void drawChart() {
     /*********************************/
     
     if(draw_volume) {
+      chartSprite.drawLine(0, main_chart_height, CANDLE_WIDTH, main_chart_height, CHART_GRID_PRICE_TICK_COLOR);
+      // Grid
+      for(int grid_i = 1; volume_step_floor + (volume_step * grid_i) <= volume_max; grid_i++){
+        int grid_line_point = main_chart_height + sub_chart_height - int((volume_step_floor + (volume_step * grid_i)) * volume_scale);
+        chartSprite.drawLine(0, grid_line_point, CANDLE_WIDTH, grid_line_point, CHART_GRID_COLOR_1);
+      }
+
       int volume_scaled = int(candle.volume * volume_scale);
       chartSprite.fillRect(0,  main_chart_height + sub_chart_height - volume_scaled, CANDLE_WIDTH, volume_scaled, color);
     }
@@ -362,16 +384,37 @@ void drawChart() {
     int grid_line_point = main_chart_height - int((step_floor + (step * grid_i) - chart_price_min) * price_scale);
     chartSprite.drawLine(1, grid_line_point, 2, grid_line_point, CHART_GRID_PRICE_TICK_COLOR);
 
-    // string height is 7 by default
-    int string_location_y = grid_line_point - 3;
-    if(string_location_y + 7 > main_chart_height){
-      string_location_y = main_chart_height -7;
+    // string height is 7 by default, add 1px padding
+    int string_location_y = grid_line_point - 4;
+    if(string_location_y + 8 > main_chart_height){
+      string_location_y = main_chart_height -8;
     }
     else if (string_location_y < 0){
       string_location_y = 0;
     }
     chartSprite.setCursor(4,string_location_y);
     chartSprite.print(getPriceString(step_floor + (step * grid_i)));
+  }
+
+  // Volume Grid
+  if(draw_volume) {
+    chartSprite.drawLine(0, main_chart_height, CHART_GRID_PRICE_TICK_WIDTH, main_chart_height, CHART_GRID_PRICE_TICK_COLOR);
+    // Grid
+    for(int grid_i = 1; volume_step_floor + (volume_step * grid_i) <= volume_max; grid_i++){
+      int grid_line_point = main_chart_height + sub_chart_height - int((volume_step_floor + (volume_step * grid_i)) * volume_scale);
+      chartSprite.drawLine(1, grid_line_point, 2, grid_line_point, CHART_GRID_PRICE_TICK_COLOR);
+
+      // string height is 7 by default, add 1px padding
+      int string_location_y = grid_line_point - 4;
+      if(string_location_y + 8 > main_chart_height + sub_chart_height){
+        string_location_y = main_chart_height + sub_chart_height -8;
+      }
+      else if (string_location_y < main_chart_height + 1){
+        string_location_y = main_chart_height + 1;
+      }
+      chartSprite.setCursor(4,string_location_y);
+      chartSprite.print(getPriceString(volume_step_floor + (volume_step * grid_i)));
+    }
   }
 
   // last closing price in colored box as tick
@@ -386,7 +429,7 @@ void drawChart() {
   }
   chartSprite.setTextColor(WHITE);
   chartSprite.fillRect(1, last_price_point, CHART_GRID_PRICE_TICK_WIDTH - 1, box_height, color);
-  chartSprite.setCursor(4,last_price_point + ((box_height - 7)/2));
+  chartSprite.setCursor(3,last_price_point + ((box_height - 7)/2));
   chartSprite.print(getPriceString(last_price));
   
   chartSprite.pushSprite(CHART_LEFT + ((chartBuffer.size() - MOVING_AVG_MAX) * CANDLE_WIDTH), CHART_TOP);
