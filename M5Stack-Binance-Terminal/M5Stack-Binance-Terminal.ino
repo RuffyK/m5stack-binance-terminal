@@ -11,17 +11,22 @@
 
 #include <RingBuf.h>
 
-#define USE_SERIAL Serial
+#define SYMBOL "btcusdt"
 
-#define CHART_WIDTH 300
+const char WiFiAPPSK[] = "ruffycrabby";
+const char APNAME[] = "M5Stack-1";
+
+#define CHART_WIDTH 320
 #define CHART_HEIGHT 190
 #define CHART_TOP 40
 #define CHART_LEFT 0
 #define SUB_CHART_HEIGHT 40
 #define CANDLE_WIDTH 3
-#define MOVING_AVG_MAX 100
-#define CHART_POINTS (int(CHART_WIDTH / CANDLE_WIDTH) + MOVING_AVG_MAX)
-#define KLINE_BUF_SIZE (CHART_POINTS * 290)
+
+#define CHART_GRID_MAX_STEPS 7
+#define CHART_GRID_COLOR_1 0x1925
+#define CHART_GRID_PRICE_TICK_WIDTH 46
+#define CHART_GRID_PRICE_TICK_COLOR 0x4AAB
 
 #define COLOR_RED 0xF22B
 #define COLOR_GREEN 0x0E50
@@ -39,10 +44,10 @@
 #define EMA_2_LENGTH 100
 #define EMA_2_COLOR 0xAB85
 
-#define SYMBOL "btcusdt"
+#define MOVING_AVG_MAX 100
+#define CHART_POINTS (int((CHART_WIDTH - CHART_GRID_PRICE_TICK_WIDTH) / CANDLE_WIDTH) + MOVING_AVG_MAX)
+#define KLINE_BUF_SIZE (CHART_POINTS * 290)
 
-const char WiFiAPPSK[] = "ruffycrabby";
-const char APNAME[] = "M5Stack-1";
 AsyncWebServer server(80);
 
 WebSocketsClient webSocket;
@@ -67,7 +72,33 @@ struct chartDataPoint {
 RingBuf<chartDataPoint, CHART_POINTS> chartBuffer;
 TFT_eSprite chartSprite = TFT_eSprite(&M5.Lcd);
 
+String getPriceString(float price) {
+  if(price >= 100000){
+    return String(price, 0);
+  }
+  else if(price >= 10000) {
+    return String(price, 1);
+  }
+  else if(price >= 1000) {
+    return String(price, 2);
+  }
+  else if(price >= 100) {
+    return String(price, 3);
+  }
+  else if(price >= 10) {
+    return String(price, 4);
+  }
+  else if(price >= 1) {
+    return String(price, 5);
+  }
+  else{
+    return String(price, 6);
+  }
+}
+
 void drawChart() { 
+  // Ram not big enough, must make chart with 2 sprites :(
+  chartSprite.createSprite(CANDLE_WIDTH, CHART_HEIGHT);
   
   float local_min = 1000000000000;
   float local_max = 0;
@@ -211,14 +242,41 @@ void drawChart() {
   const float price_scale = main_chart_height / (chart_price_max - chart_price_min);
   const float volume_scale = sub_chart_height / volume_max;
 
+  int step_count = CHART_GRID_MAX_STEPS;
+  float step = (chart_price_max - chart_price_min) / (float)(step_count+1);
+  float order = powf(10, floorf(log10(step)));
+  float delta = (int)(step / order + 0.5);
+
+  step = delta * order;
+  static float ndex[] = {1, 1.5, 2, 2.5, 5, 10};
+  static int ndexLenght = sizeof(ndex)/sizeof(float);
+  for(int i = ndexLenght - 2; i > 0; --i) {
+      if(delta > ndex[i]) {
+        step = ndex[i + 1] * order;
+        break;
+      }
+  }
+  float step_floor = chart_price_min - fmod(chart_price_min, step) + step;
+
+  uint16_t color = COLOR_GREEN;
+  bool isLoss = false;
   for(int i = MOVING_AVG_MAX; i< chartBuffer.size(); i++) {
     chartSprite.fillSprite(backColor);
     
     int index = i - MOVING_AVG_MAX;
     chartDataPoint candle = chartBuffer[i];
-    bool isLoss = candle.closePrice < candle.openPrice;
-   
-    
+    isLoss = candle.closePrice < candle.openPrice;
+
+    /*********************************/
+    /*   Grid                        */
+    /*********************************/
+
+    for(int grid_i = 0; step_floor + (step * grid_i) <= chart_price_max; grid_i++){
+      int grid_line_point = main_chart_height - int((step_floor + (step * grid_i) - chart_price_min) * price_scale);
+      chartSprite.drawLine(0, grid_line_point, CANDLE_WIDTH, grid_line_point, CHART_GRID_COLOR_1);
+    }
+
+
     /*********************************/
     /*   Bollinger Bands             */
     /*********************************/
@@ -260,7 +318,7 @@ void drawChart() {
     /*********************************/
     /*   Candles                     */
     /*********************************/
-    uint16_t color = COLOR_GREEN;
+    color = COLOR_GREEN;
     if(isLoss) {
       color = COLOR_RED;
     }
@@ -289,6 +347,50 @@ void drawChart() {
     
     chartSprite.pushSprite(CHART_LEFT + (index * CANDLE_WIDTH), CHART_TOP);
   }
+  chartSprite.deleteSprite();
+  /*********************************/
+  /*   Grid Ticks                  */
+  /*********************************/
+
+  chartSprite.createSprite(CHART_GRID_PRICE_TICK_WIDTH, CHART_HEIGHT);
+  chartSprite.fillSprite(backColor);
+  chartSprite.drawLine(0, 0, 0, CHART_HEIGHT, CHART_GRID_PRICE_TICK_COLOR);
+  chartSprite.setTextSize(1);
+  chartSprite.setTextColor(CHART_GRID_PRICE_TICK_COLOR);
+  // Main Grid
+  for(int grid_i = 0; step_floor + (step * grid_i) <= chart_price_max; grid_i++){
+    int grid_line_point = main_chart_height - int((step_floor + (step * grid_i) - chart_price_min) * price_scale);
+    chartSprite.drawLine(1, grid_line_point, 2, grid_line_point, CHART_GRID_PRICE_TICK_COLOR);
+
+    // string height is 7 by default
+    int string_location_y = grid_line_point - 3;
+    if(string_location_y + 7 > main_chart_height){
+      string_location_y = main_chart_height -7;
+    }
+    else if (string_location_y < 0){
+      string_location_y = 0;
+    }
+    chartSprite.setCursor(4,string_location_y);
+    chartSprite.print(getPriceString(step_floor + (step * grid_i)));
+  }
+
+  // last closing price in colored box as tick
+  const int box_height = 14;
+  float last_price = chartBuffer[chartBuffer.size() - 1].closePrice;
+  int last_price_point = main_chart_height - int((last_price - chart_price_min) * price_scale) - (box_height / 2);
+  if(last_price_point + box_height > main_chart_height) {
+    last_price_point = main_chart_height - box_height;
+  }
+  else if (last_price_point < 0) {
+    last_price_point = 0;
+  }
+  chartSprite.setTextColor(WHITE);
+  chartSprite.fillRect(1, last_price_point, CHART_GRID_PRICE_TICK_WIDTH - 1, box_height, color);
+  chartSprite.setCursor(4,last_price_point + ((box_height - 7)/2));
+  chartSprite.print(getPriceString(last_price));
+  
+  chartSprite.pushSprite(CHART_LEFT + ((chartBuffer.size() - MOVING_AVG_MAX) * CANDLE_WIDTH), CHART_TOP);
+  chartSprite.deleteSprite();
 }
 
 void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
@@ -296,14 +398,14 @@ void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
 
     switch(type) {
         case WStype_DISCONNECTED:
-            USE_SERIAL.printf("[WSc] Disconnected!\n");
+            Serial.printf("[WSc] Disconnected!\n");
             break;
         case WStype_CONNECTED: {
-            USE_SERIAL.printf("[WSc] Connected to url: %s\n",  payload);
+            Serial.printf("[WSc] Connected to url: %s\n",  payload);
           }
           break;
         case WStype_TEXT: {
-            //USE_SERIAL.printf("[WSc] get text: %s\n", payload);
+            //Serial.printf("[WSc] get text: %s\n", payload);
             deserializeJson(webSocketBuf, payload);
             JsonObject response = webSocketBuf.as<JsonObject>();
             
@@ -350,27 +452,7 @@ void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
             //M5.Lcd.setCursor(0,84);
             //M5.Lcd.setTextSize(6);
             M5.Lcd.print(" ");
-            if(closePrice >= 100000){
-              M5.Lcd.println(closePrice, 0);
-            }
-            else if(closePrice >= 10000) {
-              M5.Lcd.println(closePrice, 1);
-            }
-            else if(closePrice >= 1000) {
-              M5.Lcd.println(closePrice, 2);
-            }
-            else if(closePrice >= 100) {
-              M5.Lcd.println(closePrice, 3);
-            }
-            else if(closePrice >= 10) {
-              M5.Lcd.println(closePrice, 4);
-            }
-            else if(closePrice >= 1) {
-              M5.Lcd.println(closePrice, 5);
-            }
-            else{
-              M5.Lcd.println(closePrice, 6);
-            }
+            M5.Lcd.println(getPriceString(closePrice));
           }
           break;
     case WStype_BIN:
@@ -524,10 +606,6 @@ void setup(){
 
   webSocket.onEvent(webSocketEvent);
 
-  
-  // Ram not big enough, must make chart with 2 sprites :(
-  chartSprite.createSprite(CANDLE_WIDTH, CHART_HEIGHT);
-  //chartSprite.setColorDepth(8);
 }
 
 const long status_interval = 5000;
