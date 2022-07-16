@@ -1,22 +1,22 @@
 #include "WiFiApi.h"
 StaticJsonDocument<200> jsonBuf;
-void useWiFiApi(AsyncWebServer   *server) {
-	server->on("/api/wifi/status", HTTP_GET, [](AsyncWebServerRequest *request) {
+void useWiFiApi(WebServer   *server) {
+	server->on("/api/wifi/status", HTTP_GET, [server]() {
     Serial.println("[WiFiApi] Get WiFi Status");
-		request->send(200, "application/json", getWiFiStatus());
+		server->send(200, "application/json", getWiFiStatus());
 	});
 
-	server->on("/api/wifi/scan", HTTP_GET, [](AsyncWebServerRequest *request) {
-		bool hidden = request->hasArg("hidden");
+	server->on("/api/wifi/scan", HTTP_GET, [server]() {
+		bool hidden = server->hasArg("hidden");
     Serial.println("[WiFiApi] Get Available Networks");
-		if (request->hasArg("hidden")) {
-			hidden = request->arg("hidden") == "true";
+		if (server->hasArg("hidden")) {
+			hidden = server->arg("hidden") == "true";
 		}
-		request->send(200, "application/json", getAvailableNetworks(hidden));
+		server->send(200, "application/json", getAvailableNetworks(hidden));
 	});
-	server->on("/api/wifi/connect", HTTP_POST, [](AsyncWebServerRequest *request) {
+	server->on("/api/wifi/connect", HTTP_POST, [server]() {
     Serial.print("[WiFiApi] Connect to Network, ");
-		String json = request->arg("plain");
+		String json = server->arg("plain");
     deserializeJson(jsonBuf, json);
 
 		String ssid = jsonBuf["ssid"];
@@ -54,7 +54,7 @@ void useWiFiApi(AsyncWebServer   *server) {
 		Serial.print("Success: ");
 		Serial.println(success);
 
-		request->send(200, "application/json", "{\"success\": " + String(success) + "}");
+		server->send(200, "application/json", "{\"success\": " + String(success) + "}");
 
 	});
 }

@@ -1,9 +1,10 @@
 #include <M5Stack.h>
 #include <WiFi.h>
 #include <WiFiAP.h>
-#include <ESPAsyncWebServer.h>
+#include <WebServer.h>
 #include <SPIFFS.h>
 #include "WiFiApi.h"
+#include "StaticFsWebService.h"
 
 #include <WebSocketsClient.h>
 #include <WiFiClient.h>
@@ -49,7 +50,9 @@ const char APNAME[] = "M5Stack-1";
 #define CHART_POINTS (int((CHART_WIDTH - CHART_GRID_PRICE_TICK_WIDTH) / CANDLE_WIDTH) + MOVING_AVG_MAX)
 #define KLINE_BUF_SIZE (CHART_POINTS * 290)
 
-AsyncWebServer server(80);
+WebServer server(80);
+
+StaticFsWebService fsWebService(&server);
 
 WebSocketsClient webSocket;
 DynamicJsonDocument webSocketBuf(512);
@@ -643,8 +646,7 @@ void setup(){
 
   useWiFiApi(&server);
   
-  server.serveStatic("/", SPIFFS, "/wwwroot/")
-    .setDefaultFile("index.html");
+  fsWebService.begin("/wwwroot");
   server.begin();
 
   webSocket.onEvent(webSocketEvent);
@@ -661,6 +663,7 @@ const int bat_icon_y = 0;
 
 void loop() {
   webSocket.loop();
+  server.handleClient();
   M5.update();
   if (millis() - status_millis_last >= status_interval) {
     status_millis_last += status_interval;
