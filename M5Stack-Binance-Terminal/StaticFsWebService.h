@@ -5,17 +5,15 @@
 #include <FS.h>
 #include <WebServer.h>
 
-#define ROOT_PATH "/wwwroot"
-
 class StaticFsWebService{
-public:
-	StaticFsWebService(WebServer *server);
-	virtual ~StaticFsWebService();
-	void begin(String rootDir);
+    public:
+        StaticFsWebService(WebServer *server);
+        virtual ~StaticFsWebService();
+        void begin(String rootDir);
 
-private:
-    WebServer *server;
-	String getMimeType(String fileName);
+    private:
+        WebServer *server;
+        String getMimeType(String fileName);
 };
 
 #endif
