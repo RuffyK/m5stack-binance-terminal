@@ -2,12 +2,12 @@
 #define RUFFYWIFIAPI_H_
 
 #include "Arduino.h"
-#include <ESPAsyncWebServer.h>
+#include <WebServer.h>
 #include <WiFi.h>
 #include "ArduinoJson.h"
 
 
-void useWiFiApi(AsyncWebServer  *server);
+void useWiFiApi(WebServer  *server);
 String getWiFiStatus(void);
 String getAvailableNetworks(bool showHidden);
 void handleConnect(String body);
